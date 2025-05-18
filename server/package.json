@@ -1,0 +1,24 @@
+{
+  "name": "server",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsc && bun ./dist/index.js"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "concurrently": "^9.1.2",
+    "nodemon": "^3.1.10"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@zap-socket/server": "^0.0.18",
+    "mediasoup": "^3.15.8",
+    "tsx": "^4.19.4",
+    "typescript": "^5",
+    "zod": "^3.24.4"
+  }
+}
