@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@zap-socket/react": "^0.0.9",
+    "hls.js": "^1.6.2",
     "mediasoup-client": "3",
     "next": "15.3.2",
     "react": "^19.0.0",

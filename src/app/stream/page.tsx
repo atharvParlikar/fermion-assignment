@@ -3,7 +3,7 @@
 import mediasoupClient from "mediasoup-client"
 import { useEffect, useRef } from "react";
 import { useZap } from '@zap-socket/react'
-import type { Events } from "../../../server/src/index";
+import type { Events } from "../../../server/src/mediaSoupServer";
 import toast from "react-hot-toast";
 
 export default function Stream() {
@@ -127,10 +127,10 @@ export default function Stream() {
   }, [connected]);
 
   return (
-    <div className="flex flex-col gap-4 h-screen w-screen justify-center items-cetner">
+    <div className="flex flex-col gap-4 h-screen w-screen justify-center items-center">
       <div className="bg-green-400 h-fit w-fit p-0.5 text-black">
         self
-        <video className="video" autoPlay muted ref={selfVideoRef} />
+        <video autoPlay muted ref={selfVideoRef} />
       </div>
 
       <div className="bg-blue-400 h-fit w-fit p-0.5 text-black">

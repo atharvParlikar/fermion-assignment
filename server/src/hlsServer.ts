@@ -3,6 +3,7 @@ import path from "path";
 import * as mediasoup from "mediasoup";
 import getPort from "get-port";
 import { writeFileSync } from "node:fs";
+import { nanoid } from "nanoid";
 
 type StartHlsStreamOptions = {
   videoProducerId: string;
@@ -15,13 +16,13 @@ export async function startHlsStream({
   router,
   outputDirRoot = "./hls"
 }: StartHlsStreamOptions) {
-  const streamId = Date.now().toString();
+  const streamId = nanoid();
   const outputDir = path.resolve(`${outputDirRoot}/stream-${streamId}`);
   const outputPlaylist = path.join(outputDir, "index.m3u8");
 
   spawn("mkdir", ["-p", outputDir]);
 
-  const ffmpegPort = await getPort({ port: [4000, 4001] });
+  const ffmpegPort = await getPort({ port: [4000, 4002] });
   const sdpPath = generateSdpFile(ffmpegPort, outputDir);
 
   const ffmpeg = spawn('ffmpeg', [
@@ -36,9 +37,12 @@ export async function startHlsStream({
     '-flags', 'low_delay', // Low delay flag
     '-crf', '18', // visually-lossless (0 is truely lossless).
     '-strict', 'experimental', // Enable experimental features
+    '-g', '46',
+    '-keyint_min', '46',
+    '-sc_threshold', '0',
     '-f', 'hls',
     '-hls_time', '2',
-    '-hls_list_size', '6',
+    '-hls_list_size', '2',
     '-hls_flags', 'delete_segments',
     '-hls_segment_filename', `${outputDir}/segment_%03d.ts`,
     `${outputDir}/stream.m3u8`
@@ -102,8 +106,7 @@ a=rtcp-fb:97 nack pli
 a=rtcp-fb:97 ccm fir
 a=rtcp-fb:97 goog-remb
 a=sendonly
-`;
-
+`.trim();
 
   writeFileSync(`${dir}/input.sdp`, sdp);
 
