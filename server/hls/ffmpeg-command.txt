@@ -1,0 +1,1 @@
+ffmpeg -protocol_whitelist file,udp,rtp -i input.sdp   -c:v libx264 -preset veryfast -tune zerolatency   -f hls   -hls_time 2 -hls_list_size 6 -hls_flags delete_segments   -hls_segment_filename segment_%03d.ts   stream.m3u8

@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@zap-socket/server": "^0.0.18",
+    "get-port": "^7.1.0",
     "mediasoup": "^3.15.8",
     "tsx": "^4.19.4",
     "typescript": "^5",

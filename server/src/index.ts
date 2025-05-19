@@ -1,7 +1,8 @@
 import * as mediasoup from "mediasoup";
 import { createZapServer, zapEvent, zapServerEvent } from "@zap-socket/server";
 import { z } from "zod";
-import { startHlsStreamFromProducers } from "./hlsServer";
+import { startHlsStream } from "./hlsServer";
+import path from "path";
 
 const createWorker = async () => {
   const newWorker = await mediasoup.createWorker({
@@ -150,8 +151,7 @@ const events = {
 
       // start a RTP stream for ffmpeg HLS conversion
       if (self && self.video && self.audio) {
-        startHlsStreamFromProducers({
-          audioProducerId: self.audio.id,
+        startHlsStream({
           videoProducerId: self.video.id,
           router,
           outputDirRoot: "./hls"

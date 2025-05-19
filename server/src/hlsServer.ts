@@ -1,126 +1,111 @@
-import { writeFileSync } from "fs";
 import { spawn } from "child_process";
 import path from "path";
 import * as mediasoup from "mediasoup";
+import getPort from "get-port";
+import { writeFileSync } from "node:fs";
 
 type StartHlsStreamOptions = {
-  audioProducerId: string;
   videoProducerId: string;
   router: mediasoup.types.Router;
   outputDirRoot?: string; // e.g. "./hls"
 };
 
-export async function startHlsStreamFromProducers({
-  audioProducerId,
+export async function startHlsStream({
   videoProducerId,
   router,
   outputDirRoot = "./hls"
 }: StartHlsStreamOptions) {
-  const audioTransport = await router.createPlainTransport({
-    listenIp: "127.0.0.1",
-    port: 8002,
-    rtcpMux: false,
-    comedia: false
+  const streamId = Date.now().toString();
+  const outputDir = path.resolve(`${outputDirRoot}/stream-${streamId}`);
+  const outputPlaylist = path.join(outputDir, "index.m3u8");
+
+  spawn("mkdir", ["-p", outputDir]);
+
+  const ffmpegPort = await getPort({ port: [4000, 4001] });
+  const sdpPath = generateSdpFile(ffmpegPort, outputDir);
+
+  const ffmpeg = spawn('ffmpeg', [
+    '-protocol_whitelist', 'file,udp,rtp',
+    '-i', sdpPath,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast', // Faster than veryfast
+    '-tune', 'zerolatency',
+    '-probesize', '32', // Reduce probing time
+    '-analyzeduration', '0', // Minimize analysis time
+    '-fflags', 'nobuffer', // Disable buffering
+    '-flags', 'low_delay', // Low delay flag
+    '-crf', '18', // visually-lossless (0 is truely lossless).
+    '-strict', 'experimental', // Enable experimental features
+    '-f', 'hls',
+    '-hls_time', '2',
+    '-hls_list_size', '6',
+    '-hls_flags', 'delete_segments',
+    '-hls_segment_filename', `${outputDir}/segment_%03d.ts`,
+    `${outputDir}/stream.m3u8`
+  ]);
+
+  ffmpeg.stderr.on('data', (data) => {
+    console.error(`stderr: ${data}`);
   });
 
-  const videoTransport = await router.createPlainTransport({
-    listenIp: "127.0.0.1",
-    port: 8004,
-    rtcpMux: false,
-    comedia: false
+  ffmpeg.on('close', (code) => {
+    console.log(`Child process exited with code ${code}`);
   });
 
-  const audioConsumer = await audioTransport.consume({
-    producerId: audioProducerId,
-    rtpCapabilities: router.rtpCapabilities,
-    paused: false
+  ffmpeg.on("exit", code => {
+    console.log(`FFmpeg exited with code ${code}`);
   });
 
-  const videoConsumer = await videoTransport.consume({
+  setTimeout(() => { }, 1000); // warm up time for ffmpeg
+
+  const plainTransport = await router.createPlainTransport({
+    listenIp: "0.0.0.0",
+    rtcpMux: true,
+    comedia: false,
+    enableSrtp: false
+  });
+
+  const consumer = await plainTransport.consume({
     producerId: videoProducerId,
     rtpCapabilities: router.rtpCapabilities,
     paused: false
   });
 
-  const audioPort = audioTransport.tuple.localPort!;
-  const videoPort = videoTransport.tuple.localPort!;
 
-  const sdp = generateSdp({ audioPort, videoPort });
-  const streamId = Date.now().toString();
-  const sdpPath = path.join(__dirname, `../mediasoup-stream-${Date.now()}.sdp`);
-  const outputDir = path.resolve(`${outputDirRoot}/stream-${streamId}`);
-  const outputPlaylist = path.join(outputDir, "index.m3u8");
+  plainTransport.connect({
+    ip: "127.0.0.1",
+    port: ffmpegPort
+  });
 
-  writeFileSync(sdpPath, sdp);
-
-  // spawn("mkdir", ["-p", outputDir]);
-
-  // const ffmpeg = spawn("ffmpeg", [
-  //   "-protocol_whitelist", "file,udp,rtp",
-  //   "-f", "sdp",
-  //   "-i", sdpPath,
-  //   "-c:v", "libx264",
-  //   "-c:a", "aac",
-  //   "-f", "hls",
-  //   "-hls_time", "2",
-  //   "-hls_list_size", "6",
-  //   "-hls_flags", "delete_segments",
-  //   outputPlaylist
-  // ], {
-  //   stdio: "inherit"
-  // });
-  //
-  // ffmpeg.on("exit", code => {
-  //   console.log(`FFmpeg exited with code ${code}`);
-  // });
+  consumer.on("rtp", (whatever) => {
+    console.log(whatever);
+  });
 
   return {
-    audioConsumer,
-    videoConsumer,
-    // ffmpegProcess: ffmpeg,
     hlsPath: outputPlaylist,
     streamId
   };
 }
 
-function generateSdp({ audioPort, videoPort }: { audioPort: number, videoPort: number }) {
-  return `
+function generateSdpFile(listenPort: number, dir: string) {
+  const sdp = `
 v=0
 o=- 0 0 IN IP4 127.0.0.1
-s=Mediasoup Stream
-a=recvonly
-c=IN IP4 127.0.0.1
+s=Video Session
 t=0 0
-m=audio ${audioPort} RTP/AVP 96
-a=rtpmap:96 opus/48000/2
-m=video ${videoPort} RTP/AVP 97
+c=IN IP4 127.0.0.1
+m=video ${listenPort} RTP/AVP 97
 a=rtpmap:97 VP8/90000
-a=fmtp:97 x-google-start-bitrate=1000
-`.trim();
-}
+a=fmtp:97 profile-level-id=42e01f
+a=rtcp-fb:97 nack
+a=rtcp-fb:97 nack pli
+a=rtcp-fb:97 ccm fir
+a=rtcp-fb:97 goog-remb
+a=sendonly
+`;
 
-// function createSdpFile(type, rtpPort, rtcpPort) {
-//   const payloadType = type === 'audio' ? 111 : 96;
-//   const codec = type === 'audio' ? 'opus' : 'H264';
-//   const clockRate = type === 'audio' ? 48000 : 90000;
-//   const channels = type === 'audio' ? 2 : undefined;
-//   const fileName = `./${type}.sdp`;
-//
-//   let sdpContent = 
-//     'v=0\n' +
-//     'o=- 0 0 IN IP4 127.0.0.1\n' +
-//     's=MediaSoup RTP Stream\n' +
-//     'c=IN IP4 127.0.0.1\n' +
-//     't=0 0\n' +
-//     `m=${type} ${rtpPort} RTP/AVP ${payloadType}\n` +
-//     `a=rtcp:${rtcpPort}\n` +
-//     `a=rtpmap:${payloadType} ${codec}/${clockRate}${channels ? '/' + channels : ''}\n`;
-//
-//   // Add format-specific parameters if needed
-//   if (type === 'video') {
-//     sdpContent += 'a=fmtp:96 profile-level-id=42e01f;level-asymmetry-allowed=1;packetization-mode=1\n';
-//   }
-//
-//   fs.writeFileSync(fileName, sdpContent);
-//   return fileName;
-// }
+
+  writeFileSync(`${dir}/input.sdp`, sdp);
+
+  return dir + "/input.sdp"
+}
