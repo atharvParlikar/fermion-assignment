@@ -27,7 +27,7 @@ const mediaCodecs: mediasoup.types.RtpCodecCapability[] = [
     mimeType: "audio/opus",
     clockRate: 48000,
     channels: 2,
-    preferredPayloadType: 95,
+    preferredPayloadType: 96,
     rtcpFeedback: [
       { type: "nack" },
       { type: "nack", parameter: "pli" }
@@ -42,7 +42,7 @@ const mediaCodecs: mediasoup.types.RtpCodecCapability[] = [
       "profile-level-id": "42e01f", // Baseline profile, level 3.1
       "level-asymmetry-allowed": 1
     },
-    preferredPayloadType: 96, // Changed from 97 to avoid conflicts
+    preferredPayloadType: 97,
     rtcpFeedback: [
       { type: "nack" },
       { type: "nack", parameter: "pli" },
@@ -152,16 +152,23 @@ const events = {
       const self = producerMap.get(id);
 
       // start a RTP stream for ffmpeg HLS conversion
-      if (self && self.video && self.audio) {
-        startHlsStream({
-          videoProducerId: self.video.id,
-          router,
-          outputDirRoot: "./hls"
-        });
-      }
+      // if (self && self.video && self.audio) {
+      //   startHlsStream({
+      //     videoProducerId: self.video.id,
+      //     router,
+      //     outputDirRoot: "./hls"
+      //   });
+      // }
 
       if (peer?.audio && peer?.video && self?.audio && self?.video) {
         server.sendMessage("peerJoined", id, null); // tell current user
+
+        startHlsStream({
+          videoProducerId: self.video.id,
+          videoProducerId_: peer.video.id,
+          router,
+          outputDirRoot: "./hls"
+        });
       }
       if (self?.audio && self?.video && peerId) {
         server.sendMessage("peerJoined", peerId, null); // tell peer
