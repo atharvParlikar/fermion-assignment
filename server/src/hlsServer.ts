@@ -24,23 +24,65 @@ export async function startHlsStream({
 
   const ffmpegPort = await getPort({ port: [4000, 4002] });
   const sdpPath = generateSdpFile(ffmpegPort, outputDir);
+
+  const plainTransport = await router.createPlainTransport({
+    listenIp: "0.0.0.0",
+    rtcpMux: true,
+    comedia: false,
+    enableSrtp: false,
+  });
+
+  plainTransport.connect({
+    ip: "127.0.0.1",
+    port: ffmpegPort,
+  });
+
+  const consumer = await plainTransport.consume({
+    producerId: videoProducerId,
+    rtpCapabilities: router.rtpCapabilities,
+    paused: true
+  });
+
+  // const ffmpeg = spawn('ffmpeg', [
+  //   '-protocol_whitelist', 'file,udp,rtp',
+  //   '-i', sdpPath,
+  //   '-c:v', 'copy',
+  //   '-f', 'hls',
+  //   '-analyzeduration', '1000000',
+  //   '-probesize', '1000000',
+  //   '-hls_time', '1',
+  //   '-hls_list_size', '30',
+  //   '-hls_flags', 'delete_segments+split_by_time',
+  //   '-loglevel', 'debug',
+  //   '-hls_segment_filename', `${outputDir}/segment_%03d.ts`,
+  //   `${outputDir}/stream.m3u8`
+  // ]);
   const ffmpeg = spawn('ffmpeg', [
     '-protocol_whitelist', 'file,udp,rtp',
     '-i', sdpPath,
-    '-c:v', 'copy', // Copy H264 stream directly (no re-encoding)
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-tune', 'zerolatency',
+    '-x264-params', 'bframes=0:scenecut=0:rc-lookahead=0',
     '-probesize', '32',
     '-analyzeduration', '0',
     '-fflags', 'nobuffer+flush_packets',
     '-flags', 'low_delay',
-    '-avoid_negative_ts', 'make_zero', // Handle timestamp issues
+    '-crf', '23', // Balanced quality/speed
+    '-g', '30', // Keyframe every 30 frames
+    '-keyint_min', '30',
+    '-sc_threshold', '0',
     '-f', 'hls',
-    '-hls_time', '1', // Reduced from 2 seconds for lower latency
-    '-hls_list_size', '3', // Keep more segments for reliability
+    '-hls_time', '1',
+    '-hls_list_size', '3',
     '-hls_flags', 'delete_segments+split_by_time',
-    '-hls_segment_type', 'mpegts',
     '-hls_segment_filename', `${outputDir}/segment_%03d.ts`,
     `${outputDir}/stream.m3u8`
   ]);
+
+  ffmpeg.stdout.on('data', (data) => {
+    console.log(`stdout: ${data}`);
+  })
 
   ffmpeg.stderr.on('data', (data) => {
     console.error(`stderr: ${data}`);
@@ -48,36 +90,18 @@ export async function startHlsStream({
 
   ffmpeg.on('close', (code) => {
     console.log(`Child process exited with code ${code}`);
+    spawn("rm", ["-r", outputDir]);
   });
 
   ffmpeg.on("exit", code => {
     console.log(`FFmpeg exited with code ${code}`);
   });
 
-  setTimeout(() => { }, 1000); // warm up time for ffmpeg
-
-  const plainTransport = await router.createPlainTransport({
-    listenIp: "0.0.0.0",
-    rtcpMux: true,
-    comedia: false,
-    enableSrtp: false
-  });
-
-  const consumer = await plainTransport.consume({
-    producerId: videoProducerId,
-    rtpCapabilities: router.rtpCapabilities,
-    paused: false
-  });
-
-
-  plainTransport.connect({
-    ip: "127.0.0.1",
-    port: ffmpegPort
-  });
-
   consumer.on("rtp", (whatever) => {
     console.log(whatever);
   });
+
+  setTimeout(() => consumer.resume(), 100);
 
   return {
     hlsPath: outputPlaylist,
@@ -99,10 +123,11 @@ a=rtcp-fb:96 nack
 a=rtcp-fb:96 nack pli
 a=rtcp-fb:96 ccm fir
 a=rtcp-fb:96 goog-remb
+a=rtcp-mux
 a=sendonly
 `.trim();
 
   writeFileSync(`${dir}/input.sdp`, sdp);
 
-  return dir + "/input.sdp"
+  return dir + "/input.sdp";
 }
