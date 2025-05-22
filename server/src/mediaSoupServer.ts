@@ -27,7 +27,7 @@ const mediaCodecs: mediasoup.types.RtpCodecCapability[] = [
     mimeType: "audio/opus",
     clockRate: 48000,
     channels: 2,
-    preferredPayloadType: 96,
+    preferredPayloadType: 95,
     rtcpFeedback: [
       { type: "nack" },
       { type: "nack", parameter: "pli" }
@@ -35,14 +35,17 @@ const mediaCodecs: mediasoup.types.RtpCodecCapability[] = [
   },
   {
     kind: "video",
-    mimeType: "video/VP8",
+    mimeType: "video/H264",
     clockRate: 90000,
     parameters: {
-      "x-google-start-bitrate": 1000
+      "packetization-mode": 1,
+      "profile-level-id": "42e01f", // Baseline profile, level 3.1
+      "level-asymmetry-allowed": 1
     },
-    preferredPayloadType: 97,
+    preferredPayloadType: 96, // Changed from 97 to avoid conflicts
     rtcpFeedback: [
       { type: "nack" },
+      { type: "nack", parameter: "pli" },
       { type: "ccm", parameter: "fir" },
       { type: "goog-remb" }
     ]

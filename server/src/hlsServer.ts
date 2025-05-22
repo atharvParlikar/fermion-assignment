@@ -24,26 +24,20 @@ export async function startHlsStream({
 
   const ffmpegPort = await getPort({ port: [4000, 4002] });
   const sdpPath = generateSdpFile(ffmpegPort, outputDir);
-
   const ffmpeg = spawn('ffmpeg', [
     '-protocol_whitelist', 'file,udp,rtp',
     '-i', sdpPath,
-    '-c:v', 'libx264',
-    '-preset', 'ultrafast', // Faster than veryfast
-    '-tune', 'zerolatency',
-    '-probesize', '32', // Reduce probing time
-    '-analyzeduration', '0', // Minimize analysis time
-    '-fflags', 'nobuffer', // Disable buffering
-    '-flags', 'low_delay', // Low delay flag
-    '-crf', '18', // visually-lossless (0 is truely lossless).
-    '-strict', 'experimental', // Enable experimental features
-    '-g', '46',
-    '-keyint_min', '46',
-    '-sc_threshold', '0',
+    '-c:v', 'copy', // Copy H264 stream directly (no re-encoding)
+    '-probesize', '32',
+    '-analyzeduration', '0',
+    '-fflags', 'nobuffer+flush_packets',
+    '-flags', 'low_delay',
+    '-avoid_negative_ts', 'make_zero', // Handle timestamp issues
     '-f', 'hls',
-    '-hls_time', '2',
-    '-hls_list_size', '2',
-    '-hls_flags', 'delete_segments',
+    '-hls_time', '1', // Reduced from 2 seconds for lower latency
+    '-hls_list_size', '3', // Keep more segments for reliability
+    '-hls_flags', 'delete_segments+split_by_time',
+    '-hls_segment_type', 'mpegts',
     '-hls_segment_filename', `${outputDir}/segment_%03d.ts`,
     `${outputDir}/stream.m3u8`
   ]);
@@ -98,13 +92,13 @@ o=- 0 0 IN IP4 127.0.0.1
 s=Video Session
 t=0 0
 c=IN IP4 127.0.0.1
-m=video ${listenPort} RTP/AVP 97
-a=rtpmap:97 VP8/90000
-a=fmtp:97 profile-level-id=42e01f
-a=rtcp-fb:97 nack
-a=rtcp-fb:97 nack pli
-a=rtcp-fb:97 ccm fir
-a=rtcp-fb:97 goog-remb
+m=video ${listenPort} RTP/AVP 96
+a=rtpmap:96 H264/90000
+a=fmtp:96 packetization-mode=1;profile-level-id=42e01f;level-asymmetry-allowed=1
+a=rtcp-fb:96 nack
+a=rtcp-fb:96 nack pli
+a=rtcp-fb:96 ccm fir
+a=rtcp-fb:96 goog-remb
 a=sendonly
 `.trim();
 
