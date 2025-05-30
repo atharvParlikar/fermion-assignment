@@ -39,7 +39,7 @@ export default function Stream() {
         }]
       });
 
-      sendTransport.on("connect", async ({ dtlsParameters }, callback, errback) => {
+      sendTransport.on("connect", async ({ dtlsParameters }, callback) => {
         console.log("producer connected");
         await zap.events.connectTransport.send({
           type: 'producer',
@@ -102,14 +102,10 @@ export default function Stream() {
 
           const mediaStream = new MediaStream();
 
-          videoConsumer.track.onmute = () => console.log("muted")
-          videoConsumer.track.onended = () => console.log("ended")
-
           mediaStream.addTrack(videoConsumer.track);
           mediaStream.addTrack(audioConsumer.track);
 
           if (remoteVideoRef.current) {
-            console.log("Got here")
             remoteVideoRef.current.srcObject = mediaStream;
             remoteVideoRef.current.load();
             remoteVideoRef.current.play().then(() => console.log("playing...")).catch((err) => console.error("Video won't play: ", err));

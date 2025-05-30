@@ -1,7 +1,7 @@
 import * as mediasoup from "mediasoup";
 import { createZapServer, zapEvent, zapServerEvent } from "@zap-socket/server";
 import { z } from "zod";
-import { startHlsStream } from "./hlsServer";
+import { startHlsStream } from "./hlsServer.js";
 
 const createWorker = async () => {
   const newWorker = await mediasoup.createWorker({
@@ -39,7 +39,7 @@ const mediaCodecs: mediasoup.types.RtpCodecCapability[] = [
     clockRate: 90000,
     parameters: {
       "packetization-mode": 1,
-      "profile-level-id": "42e01f", // Baseline profile, level 3.1
+      "profile-level-id": "42e01f",
       "level-asymmetry-allowed": 1
     },
     preferredPayloadType: 97,
@@ -151,15 +151,6 @@ const events = {
       const peer = peerId ? producerMap.get(peerId) : null;
       const self = producerMap.get(id);
 
-      // start a RTP stream for ffmpeg HLS conversion
-      // if (self && self.video && self.audio) {
-      //   startHlsStream({
-      //     videoProducerId: self.video.id,
-      //     router,
-      //     outputDirRoot: "./hls"
-      //   });
-      // }
-
       if (peer?.audio && peer?.video && self?.audio && self?.video) {
         server.sendMessage("peerJoined", id, null); // tell current user
 
@@ -170,6 +161,7 @@ const events = {
           outputDirRoot: "./hls"
         });
       }
+
       if (self?.audio && self?.video && peerId) {
         server.sendMessage("peerJoined", peerId, null); // tell peer
       }
@@ -198,9 +190,9 @@ const events = {
 
       const peerId = Array.from(producerMap.keys()).filter(i => i !== id)[0];
       const peerProducer = producerMap.get(peerId);
-      const consumerTransporter = consumerTransportMap.get(id);
+      const consumerTransport = consumerTransportMap.get(id);
 
-      if (!(peerProducer && consumerTransporter && peerProducer.audio && peerProducer.video)) {
+      if (!(peerProducer && consumerTransport && peerProducer.audio && peerProducer.video)) {
         return {
           data: null,
           error: "Producer not found"
@@ -221,13 +213,13 @@ const events = {
         }
       }
 
-      const videoConsumer = await consumerTransporter.consume({
+      const videoConsumer = await consumerTransport.consume({
         producerId: peerProducer.video.id,
         rtpCapabilities,
         paused: false
       });
 
-      const audioConsumer = await consumerTransporter.consume({
+      const audioConsumer = await consumerTransport.consume({
         producerId: peerProducer.audio.id,
         rtpCapabilities,
         paused: false

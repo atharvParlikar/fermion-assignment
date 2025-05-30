@@ -1,5 +1,5 @@
 import express from "express";
-import { runMediaSoupServer } from "./mediaSoupServer";
+import { runMediaSoupServer } from "./mediaSoupServer.js";
 import path from "path";
 import fs from "node:fs";
 import cors from "cors";

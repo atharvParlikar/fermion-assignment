@@ -67,10 +67,10 @@ export async function startHlsStream({
 
   const ffmpeg = spawn('ffmpeg', [
     '-protocol_whitelist', 'file,udp,rtp',
+    '-i', sdpPath,
+    '-protocol_whitelist', 'file,udp,rtp',
     '-i', sdpPath_,
     '-itsoffset', '0.8',
-    '-protocol_whitelist', 'file,udp,rtp',
-    '-i', sdpPath,
     '-filter_complex',
     '[0:v]scale=640:360[v0];[1:v]scale=640:360[v1];[v0][v1]vstack=inputs=2[outv]',
     '-map', '[outv]',
