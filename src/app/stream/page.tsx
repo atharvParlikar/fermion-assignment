@@ -115,8 +115,10 @@ export default function Stream() {
         }
       });
 
-      const videoProducer = await sendTransport.produce({ track: videoTrack });
-      const audioProducer = await sendTransport.produce({ track: stream.getAudioTracks()[0] });
+      return {
+        videoProducer: await sendTransport.produce({ track: videoTrack }),
+        audioProducer: await sendTransport.produce({ track: stream.getAudioTracks()[0] })
+      }
     }
 
     setup();
